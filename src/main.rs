@@ -37,6 +37,67 @@ fn die(msg: &str) -> ! {
     std::process::exit(2);
 }
 
+/// Securely purge relay state back to installed defaults (maintenance/security).
+/// Usage: `umbra-relay --sanitize [config] [--spool] [--config] [--all] [--yes]`.
+/// Dry-run by default; choose categories with --spool / --config (default: both).
+fn relay_sanitize(args: &[String]) {
+    let has = |f: &str| args.iter().any(|a| a == f);
+    let (spool, config, all, yes) = (has("--spool"), has("--config"), has("--all"), has("--yes"));
+    let (do_spool, do_config) = if !spool && !config && !all {
+        (true, true)
+    } else {
+        (spool || all, config || all)
+    };
+
+    let cfg_path = args
+        .iter()
+        .skip(1)
+        .find(|a| !a.starts_with("--"))
+        .cloned()
+        .unwrap_or_else(|| "umbra-relay.toml".into());
+    // The spool path lives in the config; fall back to the default if unreadable.
+    let spool_path = Config::load(&cfg_path)
+        .map(|c| c.spool_path)
+        .unwrap_or_else(|_| "umbra-relay.spool".into());
+
+    let mut targets: Vec<PathBuf> = Vec::new();
+    if do_spool {
+        targets.push(PathBuf::from(&spool_path));
+        targets.push(PathBuf::from(format!(
+            "{}.tmp",
+            PathBuf::from(&spool_path).with_extension("spool").display()
+        )));
+    }
+    if do_config {
+        targets.push(PathBuf::from(&cfg_path));
+        targets.push(PathBuf::from("torrc.onion.sample"));
+    }
+
+    use unichat_core::sanitize as san;
+    let present = san::existing(&targets);
+    if present.is_empty() {
+        log("sanitize: nothing to remove (already at defaults).");
+        return;
+    }
+    if !yes {
+        log("sanitize DRY-RUN — would securely wipe:");
+        for (p, sz) in &present {
+            eprintln!("  {}  ({} KB)", p.display(), sz / 1024);
+        }
+        eprintln!("\nRe-run with --yes to perform the wipe.");
+        return;
+    }
+    let report = san::purge(&targets);
+    log(&format!(
+        "sanitized: removed {} item(s), ~{} KB — relay reset to defaults (re-run --gen-config to start fresh)",
+        report.removed_count(),
+        report.total_bytes() / 1024
+    ));
+    for (p, e) in &report.errors {
+        eprintln!("  ! {}: {e}", p.display());
+    }
+}
+
 /// Print ready-to-paste torrc for exposing the loopback binds as onion services.
 /// Clients then dial the `.onion` address; the relay only ever sees 127.0.0.1.
 fn print_onion_guidance(cfg: &Config) {
@@ -63,6 +124,10 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--gen-config") {
         print!("{}", Config::default_toml());
+        return;
+    }
+    if args.iter().any(|a| a == "--sanitize") {
+        relay_sanitize(&args);
         return;
     }
     let cfg_path = args

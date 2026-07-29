@@ -71,6 +71,18 @@ Point the app's relay/mailbox addresses at this server's `group_bind` /
 `mailbox_bind` (e.g. in the GUI's Groups relay field and Mailbox address, or the
 CLI `--via` / `--relay` flags).
 
+## Sanitize / reset (maintenance & security)
+
+Securely purge relay state back to installed defaults (each file is overwritten
+before removal). Dry-run by default; add `--yes` to perform it; choose what to
+clean with `--spool` / `--config` (default: both).
+
+```
+umbra-relay --sanitize umbra-relay.toml            # preview
+umbra-relay --sanitize umbra-relay.toml --spool --yes   # wipe only the encrypted spool
+umbra-relay --sanitize umbra-relay.toml --all --yes     # wipe spool + config (then --gen-config to start fresh)
+```
+
 ## Configuration (`umbra-relay.toml`)
 
 | Key | Meaning |
