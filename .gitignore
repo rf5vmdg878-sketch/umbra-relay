@@ -1,0 +1,10 @@
+# Build output
+/target/
+
+# Runtime state — encrypted, but still local operational data
+*.spool
+*.spool.tmp
+*.log
+
+# Generated operator config (deployment-local)
+umbra-relay.toml

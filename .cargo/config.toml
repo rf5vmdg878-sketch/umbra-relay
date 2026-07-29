@@ -1,0 +1,3 @@
+[env]
+# Locate the vendored Microsoft SymCrypt import lib (shared with the messenger).
+SYMCRYPT_LIB_PATH = { value = "../umbra/unichat-common/vendor/symcrypt/dll", relative = true }
