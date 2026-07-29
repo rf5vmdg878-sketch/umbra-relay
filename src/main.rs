@@ -59,6 +59,7 @@ fn print_onion_guidance(cfg: &Config) {
 }
 
 fn main() {
+    unichat_core::integrity::enforce(); // refuse to run a tampered build
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--gen-config") {
         print!("{}", Config::default_toml());
