@@ -37,6 +37,27 @@ fn die(msg: &str) -> ! {
     std::process::exit(2);
 }
 
+/// Print ready-to-paste torrc for exposing the loopback binds as onion services.
+/// Clients then dial the `.onion` address; the relay only ever sees 127.0.0.1.
+fn print_onion_guidance(cfg: &Config) {
+    let port_of = |bind: &str| bind.rsplit(':').next().unwrap_or("").to_string();
+    log("private_mode ON — bind loopback + front with a Tor onion service:");
+    eprintln!("  # torrc — one HiddenServiceDir, one HiddenServicePort per service:");
+    eprintln!("  HiddenServiceDir /var/lib/tor/umbra-relay/");
+    for (label, bind) in [
+        ("group", &cfg.group_bind),
+        ("mailbox", &cfg.mailbox_bind),
+        ("call", &cfg.call_bind),
+    ] {
+        if !bind.trim().is_empty() {
+            let p = port_of(bind);
+            eprintln!("  HiddenServicePort {p} {bind}   # {label}");
+        }
+    }
+    eprintln!("  # (optional) HiddenServiceAuthorizeClient / client-auth for access gating.");
+    eprintln!("  # Give clients the generated <HiddenServiceDir>/hostname (.onion).");
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--gen-config") {
@@ -54,6 +75,24 @@ fn main() {
             "{e}\n  create one with:  umbra-relay --gen-config > umbra-relay.toml"
         ))
     });
+
+    // Private mode: the relay must be unreachable except via a co-located Tor
+    // onion service, so it never sees a real client IP. Enforce loopback binds.
+    if cfg.private_mode {
+        for (svc, b) in [
+            ("group_bind", &cfg.group_bind),
+            ("mailbox_bind", &cfg.mailbox_bind),
+            ("call_bind", &cfg.call_bind),
+        ] {
+            if !b.trim().is_empty() && !config::bind_is_loopback(b) {
+                die(&format!(
+                    "private_mode is on but {svc} = \"{b}\" is not loopback.\n  \
+                     Bind each service to 127.0.0.1 and expose it as a Tor onion service."
+                ));
+            }
+        }
+        print_onion_guidance(&cfg);
+    }
 
     // Operator secret unlocks the encrypted spool. From env for unattended use,
     // else prompted.

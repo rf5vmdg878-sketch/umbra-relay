@@ -1,6 +1,14 @@
 //! Hardened TCP acceptor: source-IP allowlist, a hard concurrent-connection
 //! cap, and an idle read timeout — then hand the socket to a core protocol
-//! handler. Logs connection-level events only (never message contents).
+//! handler.
+//!
+//! Metadata discipline: client IP addresses are used *transiently* for the
+//! allowlist check and then dropped. They are NEVER logged, counted per-source,
+//! echoed in errors, or otherwise persisted — so neither the logs nor any other
+//! client can be used to learn who is connecting. In `private_mode` the relay
+//! binds loopback-only and is meant to sit behind a co-located Tor onion
+//! service, so it never even observes a real client IP (every peer looks like
+//! 127.0.0.1 from the local Tor daemon).
 
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -44,17 +52,22 @@ pub fn serve_tcp(
                 Ok(s) => s,
                 Err(_) => continue,
             };
-            let ip = stream
-                .peer_addr()
-                .map(|a| a.ip().to_string())
-                .unwrap_or_default();
-
-            if !cfg.ip_allowed(&ip) {
-                log(&format!("{name}: refused {ip} (not allowlisted)"));
+            // Peer IP is used only for the allowlist decision, then dropped in
+            // this scope. It is deliberately never logged or retained.
+            let allowed = {
+                let ip = stream
+                    .peer_addr()
+                    .map(|a| a.ip().to_string())
+                    .unwrap_or_default();
+                cfg.ip_allowed(&ip)
+            };
+            if !allowed {
+                // No IP in the message — refusals are counted, not attributed.
+                log(&format!("{name}: refused a connection (not allowlisted)"));
                 continue;
             }
             if active.load(Ordering::Relaxed) >= cfg.max_connections {
-                log(&format!("{name}: at capacity ({}), dropping {ip}", cfg.max_connections));
+                log(&format!("{name}: at capacity ({}), dropped a connection", cfg.max_connections));
                 continue;
             }
             let _ = stream.set_read_timeout(Some(Duration::from_secs(cfg.idle_timeout_secs)));

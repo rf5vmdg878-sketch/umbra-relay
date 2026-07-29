@@ -23,6 +23,12 @@ pub struct Config {
     pub spool_path: String,
     /// How often to flush an encrypted snapshot to disk.
     pub snapshot_interval_secs: u64,
+
+    /// Private mode: refuse to bind any non-loopback address, so the relay is
+    /// reachable ONLY via a co-located Tor onion service (torrc `HiddenService`).
+    /// In this mode the relay never observes a real client IP — every peer is
+    /// 127.0.0.1 from the local Tor daemon. Default off (direct-TCP binds).
+    pub private_mode: bool,
 }
 
 impl Default for Config {
@@ -36,7 +42,26 @@ impl Default for Config {
             idle_timeout_secs: 90,
             spool_path: "umbra-relay.spool".into(),
             snapshot_interval_secs: 30,
+            private_mode: false,
         }
+    }
+}
+
+/// True if `bind` (host:port) resolves to a loopback-only address.
+pub fn bind_is_loopback(bind: &str) -> bool {
+    use std::net::ToSocketAddrs;
+    match bind.to_socket_addrs() {
+        Ok(addrs) => {
+            let mut any = false;
+            for a in addrs {
+                any = true;
+                if !a.ip().is_loopback() {
+                    return false;
+                }
+            }
+            any
+        }
+        Err(_) => false,
     }
 }
 
@@ -48,7 +73,10 @@ impl Config {
 
     pub fn default_toml() -> String {
         let header = "# umbra-relay configuration.\n\
-                      # An empty *_bind disables that service. allow_ips empty = allow any source.\n\n";
+                      # An empty *_bind disables that service. allow_ips empty = allow any source.\n\
+                      # private_mode = true refuses non-loopback binds so the relay is reachable\n\
+                      # only via a co-located Tor onion service (it then never sees a client IP).\n\
+                      # Client IPs are never logged in any mode.\n\n";
         format!("{header}{}", toml::to_string_pretty(&Self::default()).unwrap_or_default())
     }
 
