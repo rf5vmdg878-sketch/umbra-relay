@@ -9,6 +9,8 @@ pub struct Config {
     pub group_bind: String,
     /// TCP bind for the mailbox; empty string disables the service.
     pub mailbox_bind: String,
+    /// TCP bind for the call relay (voice/video rendezvous); empty disables it.
+    pub call_bind: String,
 
     /// Exact source IPs allowed to connect. Empty = allow any.
     pub allow_ips: Vec<String>,
@@ -28,6 +30,7 @@ impl Default for Config {
         Self {
             group_bind: "0.0.0.0:9910".into(),
             mailbox_bind: "0.0.0.0:9900".into(),
+            call_bind: "0.0.0.0:9930".into(),
             allow_ips: Vec::new(),
             max_connections: 512,
             idle_timeout_secs: 90,

@@ -139,6 +139,18 @@ fn main() {
             Err(e) => eprintln!("umbra-relay: {e}"),
         }
     }
+    if !cfg.call_bind.trim().is_empty() {
+        // Voice/video call rendezvous: pairs two callers by call-id and pumps
+        // opaque encrypted media between them. No persistence (calls are live).
+        let cr = unichat_core::call::relay::CallRelay::new();
+        let h: Handler = Arc::new(move |s| {
+            let _ = cr.handle_connection(s);
+        });
+        match serve_tcp("call-relay", cfg.call_bind.clone(), h, cfg.clone(), active.clone()) {
+            Ok(()) => started += 1,
+            Err(e) => eprintln!("umbra-relay: {e}"),
+        }
+    }
     if started == 0 {
         die("no services enabled (set group_bind and/or mailbox_bind in the config)");
     }

@@ -33,10 +33,8 @@ $env:Path = "C:\Users\Admin\tools\mingw64\bin;$env:USERPROFILE\.cargo\bin;$env:P
 cargo build --release
 ```
 
-Depends on the messenger's shared core: clone the **umbra** repository alongside
-this one (as `../umbra`), and provide its SymCrypt DLL (see umbra's vendor
-README). Licensed MIT, Copyright (c) 2026 rf5vmdg878-sketch (see `LICENSE` and
-`THIRD-PARTY-NOTICES.md`).
+Depends on the messenger's shared core at
+`../secure-comms-unified/unichat-common/core` and its vendored SymCrypt DLL.
 
 ## Run
 
