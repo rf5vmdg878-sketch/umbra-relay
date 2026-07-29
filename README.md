@@ -28,13 +28,31 @@ sent one. On top of that this server adds:
 
 ## Build
 
+Clone this repo **alongside** the Umbra app repo (as `../umbra-relay`, next to
+`Umbra`). The app's cross-platform build tool builds the relay on Windows or
+Linux, fetching toolchain + SymCrypt for you:
+
+```sh
+# from the Umbra app repo:
+./scripts/bootstrap.sh  relay             # Linux  (non-Tor)
+./scripts/bootstrap.sh  relay --torify    # Linux  (private mode + torrc template)
+```
 ```powershell
-$env:Path = "C:\Users\Admin\tools\mingw64\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
-cargo build --release
+powershell -File scripts\bootstrap.ps1 relay            # Windows (non-Tor)
+powershell -File scripts\bootstrap.ps1 relay --torify   # Windows (private mode)
 ```
 
-Depends on the messenger's shared core at
-`../secure-comms-unified/unichat-common/core` and its vendored SymCrypt DLL.
+`--torify` writes an `umbra-relay.toml` with `private_mode = true` (loopback
+binds) plus a `torrc.onion.sample`, so the relay is ready to run behind a Tor
+onion service and never sees a real client IP.
+
+Or build directly with cargo (depends on the shared core at
+`../Umbra/unichat-common/core`; set `SYMCRYPT_LIB_PATH` to your SymCrypt lib
+directory on Linux):
+
+```sh
+cargo build --release
+```
 
 ## Run
 
@@ -57,12 +75,13 @@ CLI `--via` / `--relay` flags).
 
 | Key | Meaning |
 |---|---|
-| `group_bind` / `mailbox_bind` | TCP address per service; empty string disables it |
-| `allow_ips` | exact source IPs allowed to connect; empty = allow any |
+| `group_bind` / `mailbox_bind` / `call_bind` | TCP address per service; empty string disables it |
+| `allow_ips` | exact source IPs allowed to connect; empty = allow any (IPs are **never logged**) |
 | `max_connections` | hard cap on concurrent connections |
 | `idle_timeout_secs` | close a connection that sends nothing for this long |
 | `spool_path` | encrypted persistence file |
 | `snapshot_interval_secs` | how often to flush an encrypted snapshot |
+| `private_mode` | refuse non-loopback binds; reachable only via a co-located Tor onion service, so the relay never sees a real client IP |
 
 ## Making it a private onion relay (recommended)
 
@@ -87,5 +106,6 @@ address (and, for a truly private relay, the client-auth key) to your users.
 - Deposits/posts are unauthenticated at the relay by design (content is sealed;
   non-members produce blobs real members simply discard). The connection cap +
   allowlist bound abuse; a proof-of-work / token admission layer is future work.
-- Logs record connection-level events only — never message contents or sender
-  identities.
+- Logs record connection-level events only — never message contents, sender
+  identities, or **client IP addresses** (peer addresses are used for the
+  allowlist check and dropped immediately). Clients never learn each other's IP.

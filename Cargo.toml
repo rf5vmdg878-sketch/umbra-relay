@@ -14,7 +14,9 @@ name = "umbra-relay"
 path = "src/main.rs"
 
 [dependencies]
-unichat-core = { path = "../umbra/unichat-common/core", default-features = false }
+# Clone the app repo alongside this one (default dir name "Umbra"). On Linux
+# paths are case-sensitive, so this must match the cloned directory exactly.
+unichat-core = { path = "../Umbra/unichat-common/core", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1"
